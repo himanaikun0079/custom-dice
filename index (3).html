@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>6面サイコロ</title>
+<style>
+html,body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:#222;
+    color:white;
+    font-family:sans-serif;
+}
+
+#game{
+    position:relative;
+    width:100vw;
+    height:100vh;
+    overflow:hidden;
+}
+
+.scene{
+    position:absolute;
+    width:420px;
+    height:420px;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    perspective:1000px;
+}
+
+.dice{
+    width:208px;
+    height:208px;
+    position:absolute;
+    left:-500px;
+    top:-400px;
+    transform-style:preserve-3d;
+}
+
+.face{
+    position:absolute;
+    width:208px;
+    height:208px;
+    border:2px solid #ccc;
+    box-sizing:border-box;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    text-align:center;
+    padding:10px;
+    font-size:28px;
+    font-weight:bold;
+    color:#222;
+    user-select:none;
+    border-radius:16px;
+    box-shadow:0 0 14px rgba(0,0,0,0.5);
+    overflow:hidden;
+    word-break:break-word;
+}
+
+.front{transform:translateZ(104px);background:#ffbcbc;}
+.back{transform:rotateY(180deg) translateZ(104px);background:#bcd7ff;}
+.right{transform:rotateY(90deg) translateZ(104px);background:#bcffca;}
+.left{transform:rotateY(-90deg) translateZ(104px);background:#ffe9a8;}
+.top{transform:rotateX(90deg) translateZ(104px);background:#ddb8ff;}
+.bottom{transform:rotateX(-90deg) translateZ(104px);background:#ffd0a8;}
+
+.pips{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+}
+
+.pip{
+    position:absolute;
+    width:26px;
+    height:26px;
+    border-radius:50%;
+    background:#222;
+    transform:translate(-50%,-50%);
+}
+
+.face.custom .pips{
+    display:none;
+}
+
+.face.custom .label{
+    display:block;
+}
+
+.label{
+    position:relative;
+    z-index:2;
+    display:none;
+}
+
+.controls{
+    position:fixed;
+    bottom:40px;
+    width:100%;
+    text-align:center;
+}
+
+input{
+    width:110px;
+    padding:12px;
+    margin:6px;
+    text-align:center;
+    border:none;
+    border-radius:10px;
+    font-size:20px;
+}
+
+button{
+    padding:12px 24px;
+    margin:6px;
+    font-size:18px;
+    cursor:pointer;
+    border:none;
+    border-radius:10px;
+    background:#4cafef;
+    color:white;
+}
+
+button:hover{opacity:0.9;}
+
+#result{
+    position:fixed;
+    top:20px;
+    left:50%;
+    transform:translateX(-50%);
+    min-width:240px;
+    padding:14px 24px;
+    text-align:center;
+    font-size:28px;
+    font-weight:bold;
+    background:rgba(0,0,0,0.75);
+    border:2px solid #ffffff55;
+    border-radius:16px;
+    box-shadow:0 0 20px rgba(0,0,0,0.45);
+}
+</style>
+</head>
+<body>
+
+<div id="game">
+    <div class="scene">
+        <div class="dice" id="dice">
+            <div class="face front" id="f1" data-value="1"><div class="pips"></div><span class="label"></span></div>
+            <div class="face back" id="f2" data-value="2"><div class="pips"></div><span class="label"></span></div>
+            <div class="face right" id="f3" data-value="3"><div class="pips"></div><span class="label"></span></div>
+            <div class="face left" id="f4" data-value="4"><div class="pips"></div><span class="label"></span></div>
+            <div class="face top" id="f5" data-value="5"><div class="pips"></div><span class="label"></span></div>
+            <div class="face bottom" id="f6" data-value="6"><div class="pips"></div><span class="label"></span></div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div>
+            <input id="t1" placeholder="面1">
+            <input id="t2" placeholder="面2">
+            <input id="t3" placeholder="面3">
+        </div>
+        <div>
+            <input id="t4" placeholder="面4">
+            <input id="t5" placeholder="面5">
+            <input id="t6" placeholder="面6">
+        </div>
+        <button type="button" id="textButton">文字設定</button>
+        <button type="button" id="resetTextButton">リセット</button>
+        <button type="button" id="startButton">スタート</button>
+    </div>
+
+    <div id="result"></div>
+</div>
+
+<script>
+(function(){
+    'use strict';
+
+    const dice = document.getElementById('dice');
+    const resultBox = document.getElementById('result');
+    const textButton = document.getElementById('textButton');
+    const resetTextButton = document.getElementById('resetTextButton');
+    const startButton = document.getElementById('startButton');
+
+    const rotations = [
+        {x:0, y:0},
+        {x:0, y:180},
+        {x:0, y:-90},
+        {x:0, y:90},
+        {x:-90, y:0},
+        {x:90, y:0}
+    ];
+
+    const pipPositions = {
+        1:[[50,50]],
+        2:[[30,30],[70,70]],
+        3:[[30,30],[50,50],[70,70]],
+        4:[[30,30],[70,30],[30,70],[70,70]],
+        5:[[30,30],[70,30],[50,50],[30,70],[70,70]],
+        6:[[30,25],[70,25],[30,50],[70,50],[30,75],[70,75]]
+    };
+
+    function createPips(){
+        for(let i=1;i<=6;i++){
+            const face = document.getElementById('f' + i);
+            const pips = face.querySelector('.pips');
+            pips.innerHTML = '';
+
+            pipPositions[i].forEach(function(pos){
+                const pip = document.createElement('span');
+                pip.className = 'pip';
+                pip.style.left = pos[0] + '%';
+                pip.style.top = pos[1] + '%';
+                pips.appendChild(pip);
+            });
+        }
+    }
+
+    function applyDefaultTextures(){
+        for(let i=1;i<=6;i++){
+            const face = document.getElementById('f' + i);
+            const label = face.querySelector('.label');
+            label.textContent = '';
+            face.classList.remove('custom');
+            face.dataset.texture = 'on';
+        }
+    }
+
+    function applyText(){
+        for(let i=1;i<=6;i++){
+            const input = document.getElementById('t' + i);
+            const face = document.getElementById('f' + i);
+            const label = face.querySelector('.label');
+            const text = input.value.trim();
+
+            if(text === ''){
+                label.textContent = '';
+                face.classList.remove('custom');
+                face.dataset.texture = 'on';
+            }else{
+                label.textContent = text;
+                face.classList.add('custom');
+                face.dataset.texture = 'off';
+            }
+        }
+    }
+
+    function resetTextSettings(){
+        for(let i=1;i<=6;i++){
+            const input = document.getElementById('t' + i);
+            input.value = '';
+        }
+
+        applyDefaultTextures();
+        resultBox.textContent = '';
+
+        resetDice();
+    }
+
+    function resetDice(){
+        dice.style.transition = 'none';
+        dice.style.left = '-500px';
+        dice.style.top = '-400px';
+        dice.style.transform = 'rotateX(0deg) rotateY(0deg)';
+    }
+
+    function getFaceText(index){
+        const face = document.getElementById('f' + (index + 1));
+        const label = face.querySelector('.label').textContent.trim();
+        return label;
+    }
+
+    function rollDice(){
+        applyText();
+        resetDice();
+
+        const result = Math.floor(Math.random() * 6);
+        const rot = rotations[result];
+        const customText = getFaceText(result);
+
+        resultBox.textContent = 'ころがっています...';
+        startButton.disabled = true;
+
+        window.setTimeout(function(){
+            dice.style.transition = 'left 3s ease-out, top 3s ease-out, transform 3s ease-out';
+            dice.style.left = '106px';
+            dice.style.top = '70px';
+            dice.style.transform = 'rotateX(' + (1440 + rot.x) + 'deg) rotateY(' + (1440 + rot.y) + 'deg)';
+        }, 50);
+
+        window.setTimeout(function(){
+            resultBox.textContent = customText === '' ? String(result + 1) : customText;
+            startButton.disabled = false;
+        }, 3200);
+    }
+
+    function runTests(){
+        console.assert(document.querySelectorAll('.face').length === 6, '6面が存在する');
+        console.assert(rotations.length === 6, '停止角度が6つある');
+        console.assert(Object.keys(pipPositions).length === 6, 'サイコロ目パターンが6つある');
+        for(let i=1;i<=6;i++){
+            const face = document.getElementById('f' + i);
+            console.assert(face.querySelectorAll('.pip').length === i, '面' + i + 'の点数が正しい');
+        }
+    }
+
+    createPips();
+    applyDefaultTextures();
+    runTests();
+
+    textButton.addEventListener('click', applyText);
+    resetTextButton.addEventListener('click', resetTextSettings);
+    startButton.addEventListener('click', rollDice);
+})();
+</script>
+
+</body>
+</html>
