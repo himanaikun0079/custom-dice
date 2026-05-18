@@ -321,6 +321,10 @@ button:hover{opacity:0.9;}
     startButton.addEventListener('click', rollDice);
 })();
 </script>
-
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+</script>
 </body>
 </html>
